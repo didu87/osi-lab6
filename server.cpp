@@ -9,16 +9,16 @@ using namespace std;
 struct Node
 {
 	string key;
-	float value;
+	int value;
 	Node *l, *r;
 	Node(): value(0), l(0), r(0) {}
-	Node(string k, float v): key(k), value(v), l(0), r(0) {}
+	Node(string k, int v): key(k), value(v), l(0), r(0) {}
 };
 
 class BTree
 {
 	Node *tree;
-	Node *rappend(string key, float value, Node *&t)
+	Node *rappend(string key, int value, Node *&t)
 	{
 		if(t==0)
 		{
@@ -44,7 +44,7 @@ class BTree
 
 public:
 	BTree(): tree(0) {}
-	float& operator[](string key) { return rappend(key, 0, tree)->value; }
+	int& operator[](string key) { return rappend(key, 0, tree)->value; }
 	void print() { rprint(0,0); cout<<endl<<endl; }
 };
 
@@ -63,41 +63,92 @@ string wait_msg(zmq::socket_t &socket)
 	return msg;
 }
 
-int main () {
-    //  Prepare our context and socket
+int main (int argc, char **argv)
+{
+	if(argc<2)
+	{
+		cout<<"Specify the port of server!"<<endl;
+		exit(1);
+	}
+
+    // Prepare our context and socket
     zmq::context_t context (1);
     zmq::socket_t socket (context, ZMQ_REP);
-    socket.bind ("tcp://*:5555");
+	string port=string("tcp://*:")+string(argv[1]);
+    socket.bind(port);
+ 	cout<<"Back server started on port "<<port<<endl;
  
+	// Prepare binary tree of clients	
+	BTree account;
+
     while (true) {
 		string req = wait_msg(socket);
-        cout << "Received request: [";
-		cout << req; 
-		cout << "]" << endl;
+        cout << "Received request: [" << req << "]" << endl;
  
         //  Do some 'work'
 		stringstream iss(req);
-		string key, op;
-		float sum;
+		string op, key;
+		int sum;
  		
-		iss>>key>>op;
+		iss>>op;
 		if(op=="put")
 		{
-			iss>>sum;
+			iss>>sum>>key;
 			cout<<"put "<<sum<<" to "<<key<<endl;
+			account[key]+=sum;
+			send_msg(socket, "ok");
 		}
-		if(op=="get")
+		else if(op=="get")
 		{
-			iss>>sum;
+			iss>>sum>>key;
 			cout<<"get "<<sum<<" from "<<key<<endl;
+			int funds=account[key];
+			if(sum<=funds)
+			{
+				account[key]-=sum;
+				cout<<"ok"<<endl;
+				send_msg(socket, "ok");
+			}
+			else
+			{
+				cout<<"no enouth funds"<<endl;
+				send_msg(socket, "no enouth funds");
+			}
 		}
-		if(op=="amount")
+		else if(op=="amount")
 		{
+			iss>>key;
 			cout<<"amount of "<<key<<endl;
+			int funds=account[key];
+			stringstream oss;
+			oss<<funds;
+			send_msg(socket, oss.str());
 		}
- 
-        //  Send reply back to client
-		send_msg(socket, "ok");
+		else if(op=="transfer")
+		{
+			string dest_key;
+			iss>>sum>>key>>dest_key;
+			cout<<"transfer "<<sum<<" from "<<key<<" to"<<dest_key<<endl;
+			int funds=account[key];
+			if(sum<=funds)
+			{
+				account[key]-=sum;
+				account[dest_key]+=sum;
+				cout<<"ok"<<endl;
+				send_msg(socket, "ok");
+			}
+			else
+			{
+				cout<<"no enouth funds"<<endl;
+				send_msg(socket, "no enouth funds");
+			}
+		}
+		else
+		{
+			send_msg(socket, "uknown request");
+		}
+
+		account.print();
     }
     return 0;
 }
