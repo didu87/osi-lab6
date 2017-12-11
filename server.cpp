@@ -6,6 +6,63 @@
 
 using namespace std;
  
+struct Node
+{
+	string key;
+	float value;
+	Node *l, *r;
+	Node(): value(0), l(0), r(0) {}
+	Node(string k, float v): key(k), value(v), l(0), r(0) {}
+};
+
+class BTree
+{
+	Node *tree;
+	Node *rappend(string key, float value, Node *&t)
+	{
+		if(t==0)
+		{
+			t = new Node(key, value);
+			return t;
+		}
+		if(key < t->key)
+			return rappend(key, value, t->l);
+		if(key > t->key)
+			return rappend(key, value, t->r); 
+		return t;
+	}
+	void rprint(Node *t, int u)
+	{
+		if(t==0 && u==0) t=tree; 
+		if(t==0) return;
+		rprint(t->l,++u);
+		for(int i=0;i<u;++i) cout<<"\t";
+		cout<<t->key<<":"<<t->value<<endl;
+		u--;
+		rprint(t->r, ++u);
+	}
+
+public:
+	BTree(): tree(0) {}
+	float& operator[](string key) { return rappend(key, 0, tree)->value; }
+	void print() { rprint(0,0); cout<<endl<<endl; }
+};
+
+void send_msg(zmq::socket_t &socket, string msg)
+{
+	zmq::message_t zmq_msg(msg.length());
+	memcpy ((void *) zmq_msg.data(), msg.c_str(), msg.length());
+	socket.send (zmq_msg);
+}
+
+string wait_msg(zmq::socket_t &socket) 
+{
+	zmq::message_t zmq_msg;
+	socket.recv(&zmq_msg);
+	string msg(static_cast<char*>(zmq_msg.data()), zmq_msg.size());
+	return msg;
+}
+
 int main () {
     //  Prepare our context and socket
     zmq::context_t context (1);
@@ -13,11 +70,7 @@ int main () {
     socket.bind ("tcp://*:5555");
  
     while (true) {
-        zmq::message_t request;
- 
-        //  Wait for next request from client
-        socket.recv (&request);
-		string req(static_cast<char*>(request.data()), request.size());
+		string req = wait_msg(socket);
         cout << "Received request: [";
 		cout << req; 
 		cout << "]" << endl;
@@ -44,11 +97,7 @@ int main () {
 		}
  
         //  Send reply back to client
-		ostringstream oss("ok");
-		string rep=oss.str();
-        zmq::message_t reply(rep.length());
-        memcpy ((void *) reply.data (), rep.c_str(), rep.length());
-        socket.send (reply);
+		send_msg(socket, "ok");
     }
     return 0;
 }
