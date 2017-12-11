@@ -6,6 +6,8 @@
 
 using namespace std;
  
+#include "common.cpp"
+
 struct Node
 {
 	string key;
@@ -48,21 +50,6 @@ public:
 	void print() { rprint(0,0); cout<<endl<<endl; }
 };
 
-void send_msg(zmq::socket_t &socket, string msg)
-{
-	zmq::message_t zmq_msg(msg.length());
-	memcpy ((void *) zmq_msg.data(), msg.c_str(), msg.length());
-	socket.send (zmq_msg);
-}
-
-string wait_msg(zmq::socket_t &socket) 
-{
-	zmq::message_t zmq_msg;
-	socket.recv(&zmq_msg);
-	string msg(static_cast<char*>(zmq_msg.data()), zmq_msg.size());
-	return msg;
-}
-
 int main (int argc, char **argv)
 {
 	if(argc<2)
@@ -76,7 +63,7 @@ int main (int argc, char **argv)
     zmq::socket_t socket (context, ZMQ_REP);
 	string port=string("tcp://*:")+string(argv[1]);
     socket.bind(port);
- 	cout<<"Back server started on port "<<port<<endl;
+ 	cout<<"Bank server started on port "<<port<<endl;
  
 	// Prepare binary tree of clients	
 	BTree account;
@@ -124,7 +111,7 @@ int main (int argc, char **argv)
 			oss<<funds;
 			send_msg(socket, oss.str());
 		}
-		else if(op=="transfer")
+		else if(op=="transfer_client")
 		{
 			string dest_key;
 			iss>>sum>>key>>dest_key;
@@ -136,6 +123,31 @@ int main (int argc, char **argv)
 				account[dest_key]+=sum;
 				cout<<"ok"<<endl;
 				send_msg(socket, "ok");
+			}
+			else
+			{
+				cout<<"no enouth funds"<<endl;
+				send_msg(socket, "no enouth funds");
+			}
+		}
+		else if(op=="transfer_bank")
+		{
+			string bank_port;
+			iss>>sum>>key>>bank_port;
+			cout<<"transfer "<<sum<<" to "<<bank_port<<endl;
+			int funds=account[key];
+			if(sum<=funds)
+			{
+				zmq::context_t context(1);
+				zmq::socket_t bank_socket(context, ZMQ_REQ);
+				bank_socket.connect(string("tcp://localhost:")+bank_port);
+				string request=string("put ") + int_to_str(sum) + " " + key; 
+				send_msg(bank_socket, request);
+				string reply=wait_msg(bank_socket);
+				cout<<reply;
+				if(reply=="ok")
+					account[key]-=sum;
+				send_msg(socket, reply);
 			}
 			else
 			{
