@@ -20,16 +20,16 @@ int main ()
  
     //  Do 10 requests, waiting each time for a response
     for (int request_nbr = 0; request_nbr != 10; request_nbr++) {
-        zmq::message_t request (20);
 		string s;
-		cin>>s;
-        memcpy ((void *) request.data (), s.c_str(), s.length());
+		getline(cin, s, '\n');
+        zmq::message_t request(s.length());
+        memcpy ((void *) request.data(), s.c_str(), s.length());
         socket.send (request);
  
         //  Get the reply.
         zmq::message_t reply;
         socket.recv (&reply);
-		string res(static_cast<char*>(reply.data()));
+		string res(static_cast<char*>(reply.data()),reply.size());
         cout << "Received reply: " << res << endl;
     }
     return 0;

@@ -17,33 +17,36 @@ int main () {
  
         //  Wait for next request from client
         socket.recv (&request);
-		string req(static_cast<char*>(request.data()));
+		string req(static_cast<char*>(request.data()), request.size());
         cout << "Received request: [";
 		cout << req; 
 		cout << "]" << endl;
  
         //  Do some 'work'
-		stringstream ss(req);
-		int a,b;
-		char c;
-		ss>>a>>c>>b;
-		cout<<a<<c<<b<<endl;
-		int res;
-		switch(c)
+		stringstream iss(req);
+		string key, op;
+		float sum;
+ 		
+		iss>>key>>op;
+		if(op=="put")
 		{
-			case '+': res=a+b; break;
-			case '-': res=a-b; break;
-			case '*': res=a*b; break;
-			case '/': res=a/b; break;
+			iss>>sum;
+			cout<<"put "<<sum<<" to "<<key<<endl;
 		}
- 		cout<<"result: "<<res<<endl;
-        sleep(1);
+		if(op=="get")
+		{
+			iss>>sum;
+			cout<<"get "<<sum<<" from "<<key<<endl;
+		}
+		if(op=="amount")
+		{
+			cout<<"amount of "<<key<<endl;
+		}
  
         //  Send reply back to client
-        zmq::message_t reply (20);
-		ostringstream oss;
-		oss<<res;
+		ostringstream oss("ok");
 		string rep=oss.str();
+        zmq::message_t reply(rep.length());
         memcpy ((void *) reply.data (), rep.c_str(), rep.length());
         socket.send (reply);
     }
